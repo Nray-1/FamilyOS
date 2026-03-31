@@ -1,0 +1,12 @@
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npx serve -s build -l 3000"
+```
+
+5. Commit it
+
+Then go back to Railway, click on FamilyOS → **Variables** → **"New Variable"** and add:
+```
+PORT
