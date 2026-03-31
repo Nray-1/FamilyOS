@@ -35,8 +35,10 @@ export default function AcceptInvite() {
       await supabase.from('invites').update({ status: 'accepted' }).eq('token', token)
       navigate('/dashboard')
     } catch (err) {
-      setError(err.message || 'Something went wrong. Please try again.')
-    } finally { setSubmitting(false) }
+      setError(err.message || 'Something went wrong.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (loading) return <div className="loading-screen"><div className="spinner" /></div>
@@ -51,4 +53,33 @@ export default function AcceptInvite() {
           {invite ? (
             <>
               <h1>You've been invited</h1>
-              <p>You're joining as <strong>{invite.role.replace('_', ' ')}</strong> for <strong>{invite.patients?.na
+              <p>You're joining as <strong>{invite.role.replace('_', ' ')}</strong> for <strong>{invite.patients?.name}</strong></p>
+            </>
+          ) : <h1>Invalid Invite</h1>}
+        </div>
+        {error && <div className="error-message">{error}</div>}
+        {invite && (
+          <div className="card">
+            <form onSubmit={handleAccept}>
+              <div className="form-group">
+                <label>Your full name</label>
+                <input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Jane Smith" required />
+              </div>
+              <div className="form-group">
+                <label>Email address</label>
+                <input type="email" value={invite.email} disabled style={{ opacity: 0.6 }} />
+              </div>
+              <div className="form-group">
+                <label>Create a password</label>
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" required />
+              </div>
+              <button type="submit" className="btn btn-primary btn-lg" disabled={submitting}>
+                {submitting ? 'Setting up your account...' : 'Accept invite & join'}
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
