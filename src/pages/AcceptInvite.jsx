@@ -12,11 +12,17 @@ export default function AcceptInvite() {
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  useEffect(() => { fetchInvite() }, [token])
+  useEffect(() => {
+    fetchInvite()
+  }, [token])
 
   const fetchInvite = async () => {
     const { data, error } = await supabase
-      .from('invites').select('*, patients(name)').eq('token', token).eq('status', 'pending').single()
+      .from('invites')
+      .select('*, patients(name)')
+      .eq('token', token)
+      .eq('status', 'pending')
+      .single()
     if (error || !data) setError('This invite link is invalid or has already been used.')
     else setInvite(data)
     setLoading(false)
@@ -27,11 +33,25 @@ export default function AcceptInvite() {
     setSubmitting(true)
     setError('')
     try {
-      const { data, error: signUpError } = await supabase.auth.signUp({ email: invite.email, password })
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: invite.email,
+        password
+      })
       if (signUpError) throw signUpError
       const userId = data.user.id
-      await supabase.from('profiles').insert({ id: userId, full_name: fullName, email: invite.email, active_patient_id: invite.patient_id })
-      await supabase.from('patient_members').insert({ patient_id: invite.patient_id, user_id: userId, role: invite.role, status: 'active', invited_by: invite.invited_by })
+      await supabase.from('profiles').insert({
+        id: userId,
+        full_name: fullName,
+        email: invite.email,
+        active_patient_id: invite.patient_id
+      })
+      await supabase.from('patient_members').insert({
+        patient_id: invite.patient_id,
+        user_id: userId,
+        role: invite.role,
+        status: 'active',
+        invited_by: invite.invited_by
+      })
       await supabase.from('invites').update({ status: 'accepted' }).eq('token', token)
       navigate('/dashboard')
     } catch (err) {
@@ -48,14 +68,16 @@ export default function AcceptInvite() {
       <div className="create-patient-container" style={{ maxWidth: 480 }}>
         <div className="create-patient-header">
           <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 700, color: 'var(--navy)', marginBottom: 8 }}>
-            Fam<span style={{ color: 'var(--amber)' }}>ily</span>OS
+            FamilyOS
           </div>
           {invite ? (
-            <>
-              <h1>You've been invited</h1>
-              <p>You're joining as <strong>{invite.role.replace('_', ' ')}</strong> for <strong>{invite.patients?.name}</strong></p>
-            </>
-          ) : <h1>Invalid Invite</h1>}
+            <div>
+              <h1>You have been invited</h1>
+              <p>You are joining as {invite.role.replace('_', ' ')} for {invite.patients?.name}</p>
+            </div>
+          ) : (
+            <h1>Invalid Invite</h1>
+          )}
         </div>
         {error && <div className="error-message">{error}</div>}
         {invite && (
@@ -74,7 +96,7 @@ export default function AcceptInvite() {
                 <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" required />
               </div>
               <button type="submit" className="btn btn-primary btn-lg" disabled={submitting}>
-                {submitting ? 'Setting up your account...' : 'Accept invite & join'}
+                {submitting ? 'Setting up your account...' : 'Accept invite and join'}
               </button>
             </form>
           </div>
