@@ -35,21 +35,31 @@ export default function Dashboard() {
     setInviteMsg('')
     try {
       const token = Math.random().toString(36).substring(2) + Date.now().toString(36)
-      await supabase.from('invites').insert({ patient_id: patient.id, invited_by: user.id, email: inviteEmail, role: inviteRole, token, status: 'pending' })
-      setInviteMsg(`✓ Invite sent to ${inviteEmail}`)
+      await supabase.from('invites').insert({
+        patient_id: patient.id,
+        invited_by: user.id,
+        email: inviteEmail,
+        role: inviteRole,
+        token,
+        status: 'pending'
+      })
+      setInviteMsg('Invite sent to ' + inviteEmail)
       setInviteEmail('')
-    } catch { setInviteMsg('Failed to send invite.') }
-    finally { setInviteLoading(false) }
+    } catch {
+      setInviteMsg('Failed to send invite.')
+    } finally {
+      setInviteLoading(false)
+    }
   }
 
-  const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2) : '?'
+  const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?'
 
   const navItems = [
     { id: 'home', label: 'Dashboard', emoji: '🏠' },
     { id: 'updates', label: 'Update Feed', emoji: '📢' },
     { id: 'vault', label: 'The Vault', emoji: '🔒' },
     { id: 'care', label: 'Care Planner', emoji: '📅' },
-    { id: 'wellness', label: 'Wellness & Diet', emoji: '🥗' },
+    { id: 'wellness', label: 'Wellness and Diet', emoji: '🥗' },
     { id: 'trials', label: 'Clinical Trials', emoji: '🔬' },
     { id: 'support', label: 'Support Board', emoji: '❤️' },
     { id: 'media', label: 'Memory Wall', emoji: '📸' },
@@ -61,7 +71,7 @@ export default function Dashboard() {
     <div className="app-layout">
       <aside className="sidebar">
         <div className="sidebar-header">
-          <div className="sidebar-logo">Fam<span>ily</span>OS</div>
+          <div className="sidebar-logo">FamilyOS</div>
         </div>
         {patient && (
           <div className="sidebar-patient">
@@ -69,14 +79,14 @@ export default function Dashboard() {
               <div className="patient-name">{patient.name}</div>
               <div className="patient-status">
                 <div className="status-dot" style={{ background: patient.status === 'critical' ? '#FC8181' : '#68D391' }} />
-                {patient.status?.charAt(0).toUpperCase() + patient.status?.slice(1)}
+                {patient.status}
               </div>
             </div>
           </div>
         )}
         <nav className="sidebar-nav">
           {navItems.map(item => (
-            <button key={item.id} className={`nav-item ${activeSection === item.id ? 'active' : ''}`} onClick={() => setActiveSection(item.id)}>
+            <button key={item.id} className={'nav-item' + (activeSection === item.id ? ' active' : '')} onClick={() => setActiveSection(item.id)}>
               <span>{item.emoji}</span> {item.label}
             </button>
           ))}
@@ -90,119 +100,121 @@ export default function Dashboard() {
             </div>
           </div>
           <button className="nav-item" onClick={signOut} style={{ color: 'rgba(255,255,255,0.5)' }}>
-            🚪 Sign out
+            Sign out
           </button>
         </div>
       </aside>
 
       <main className="main-content">
         {activeSection === 'home' && (
-          <>
+          <div>
             <div className="page-header">
-              <h1 className="page-title">{patient ? `${patient.name}'s Care Hub` : 'Your Care Hub'}</h1>
+              <h1 className="page-title">{patient ? patient.name + ' Care Hub' : 'Your Care Hub'}</h1>
               <p className="page-subtitle">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
             </div>
             <div className="dashboard-grid">
-              {[
-                { label: 'Care Team Members', value: members.length, emoji: '👥' },
-                { label: 'Upcoming Appointments', value: 0, emoji: '📅' },
-                { label: 'Documents in Vault', value: 0, emoji: '📄' },
-                { label: 'Support Requests', value: 0, emoji: '❤️' },
-              ].map(stat => (
-                <div className="stat-card" key={stat.label}>
-                  <div className="stat-icon green" style={{ fontSize: '1.5rem' }}>{stat.emoji}</div>
-                  <div>
-                    <div className="stat-value">{stat.value}</div>
-                    <div className="stat-label">{stat.label}</div>
-                  </div>
-                </div>
-              ))}
+              <div className="stat-card">
+                <div className="stat-icon green">👥</div>
+                <div><div className="stat-value">{members.length}</div><div className="stat-label">Care Team Members</div></div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon amber">📅</div>
+                <div><div className="stat-value">0</div><div className="stat-label">Upcoming Appointments</div></div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon blue">📄</div>
+                <div><div className="stat-value">0</div><div className="stat-label">Documents in Vault</div></div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon purple">❤️</div>
+                <div><div className="stat-value">0</div><div className="stat-label">Support Requests</div></div>
+              </div>
             </div>
             {patient && (
               <div className="card">
-                <div className="card-title">🏥 Patient Overview</div>
+                <div className="card-title">Patient Overview</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
                   {[
-                    { label: 'Primary Diagnosis', value: patient.primary_diagnosis || 'Not specified' },
+                    { label: 'Diagnosis', value: patient.primary_diagnosis || 'Not specified' },
                     { label: 'Other Conditions', value: patient.other_conditions || 'None listed' },
                     { label: 'Allergies', value: patient.allergies || 'None listed' },
-                    { label: 'Primary Doctor', value: patient.primary_doctor || 'Not specified' },
+                    { label: 'Doctor', value: patient.primary_doctor || 'Not specified' },
                     { label: 'Hospital', value: patient.hospital || 'Not specified' },
-                    { label: 'Status', value: patient.status?.charAt(0).toUpperCase() + patient.status?.slice(1) },
+                    { label: 'Status', value: patient.status },
                   ].map(item => (
                     <div key={item.label} style={{ padding: '12px 16px', background: 'var(--cream)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--slate-light)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{item.label}</div>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--navy)' }}>{item.value}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--slate-light)', marginBottom: 4 }}>{item.label}</div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>{item.value}</div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-          </>
+          </div>
         )}
 
         {activeSection === 'team' && (
-          <>
+          <div>
             <div className="page-header">
               <h1 className="page-title">Care Team</h1>
-              <p className="page-subtitle">Manage who has access and what they can see</p>
+              <p className="page-subtitle">Manage who has access</p>
             </div>
             <div className="invite-grid">
               <div className="card">
-                <div className="card-title">➕ Invite Someone</div>
-                {inviteMsg && <div className={inviteMsg.startsWith('✓') ? 'success-message' : 'error-message'}>{inviteMsg}</div>}
+                <div className="card-title">Invite Someone</div>
+                {inviteMsg && <div className="success-message">{inviteMsg}</div>}
                 <form onSubmit={sendInvite}>
                   <div className="form-group">
-                    <label>Their email address</label>
+                    <label>Email address</label>
                     <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="sister@example.com" required />
                   </div>
                   <div className="form-group">
-                    <label>Their access level</label>
+                    <label>Access level</label>
                     <select value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
-                      <option value="inner_circle">Inner Circle — sees medical updates & shared documents</option>
-                      <option value="community">Community — sees updates & support board only</option>
+                      <option value="inner_circle">Inner Circle - sees medical updates</option>
+                      <option value="community">Community - sees updates only</option>
                     </select>
                   </div>
                   <button type="submit" className="btn btn-primary" disabled={inviteLoading}>
-                    {inviteLoading ? 'Sending...' : '📨 Send invite'}
+                    {inviteLoading ? 'Sending...' : 'Send invite'}
                   </button>
                 </form>
               </div>
               <div className="card">
-                <div className="card-title">👥 Current Members ({members.length})</div>
+                <div className="card-title">Current Members ({members.length})</div>
                 <div className="member-list">
                   {members.length === 0 ? (
-                    <div className="empty-state"><p>No members yet. Invite family and friends to get started.</p></div>
+                    <p style={{ color: 'var(--slate-light)' }}>No members yet.</p>
                   ) : members.map(m => (
                     <div className="member-item" key={m.id}>
                       <div className="member-avatar">{getInitials(m.profiles?.full_name || '')}</div>
                       <div style={{ flex: 1 }}>
                         <div className="member-name">{m.profiles?.full_name || 'Pending'}</div>
-                        <div className="member-email">{m.profiles?.email || m.email}</div>
+                        <div className="member-email">{m.profiles?.email}</div>
                       </div>
-                      <span className={`role-badge ${m.role}`}>{m.role.replace('_', ' ')}</span>
+                      <span className={'role-badge ' + m.role}>{m.role.replace('_', ' ')}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
-          </>
+          </div>
         )}
 
         {!['home', 'team'].includes(activeSection) && (
-          <>
+          <div>
             <div className="page-header">
               <h1 className="page-title">{navItems.find(n => n.id === activeSection)?.label}</h1>
-              <p className="page-subtitle">This section is coming soon — being built now</p>
+              <p className="page-subtitle">Coming soon</p>
             </div>
             <div className="card">
               <div className="empty-state">
                 <p style={{ fontSize: '3rem', marginBottom: 16 }}>🚧</p>
                 <h3>Coming soon</h3>
-                <p>This feature is actively being built. Check back soon!</p>
+                <p>This feature is being built.</p>
               </div>
             </div>
-          </>
+          </div>
         )}
       </main>
     </div>
