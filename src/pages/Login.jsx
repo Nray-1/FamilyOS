@@ -27,18 +27,13 @@ export default function Login() {
   return (
     <div className="auth-page">
       <div className="auth-brand">
-        <div className="brand-logo">Fam<span>ily</span>OS</div>
+        <div className="brand-logo">FamilyOS</div>
         <p className="brand-tagline">The all-in-one platform for families navigating care together.</p>
-        <div className="brand-features">
-          {['Private document vault','Real-time family updates','AI-powered care planning','Clinical trials finder'].map(f => (
-            <div className="brand-feature" key={f}><div className="brand-feature-dot" />{f}</div>
-          ))}
-        </div>
       </div>
       <div className="auth-panel">
         <div className="auth-form-container">
           <h1>Welcome back</h1>
-          <p className="auth-subtitle">Sign in to your family's care hub</p>
+          <p className="auth-subtitle">Sign in to your family care hub</p>
           {error && <div className="error-message">{error}</div>}
           <form onSubmit={handleSubmit}>
             <div className="form-group">
@@ -47,14 +42,14 @@ export default function Login() {
             </div>
             <div className="form-group">
               <label>Password</label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" required />
             </div>
             <button type="submit" className="btn btn-primary btn-lg" disabled={loading}>
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
           <div className="auth-footer">
-            Don't have an account? <Link to="/register">Create one free</Link>
+            No account? <Link to="/register">Create one free</Link>
           </div>
         </div>
       </div>
