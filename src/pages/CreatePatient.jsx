@@ -9,8 +9,9 @@ export default function CreatePatient() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({
-    name: '', date_of_birth: '', primary_diagnosis: '', other_conditions: '',
-    allergies: '', primary_doctor: '', doctor_phone: '', hospital: '', relationship: '', status: 'stable',
+    name: '', date_of_birth: '', primary_diagnosis: '',
+    other_conditions: '', allergies: '', primary_doctor: '',
+    doctor_phone: '', hospital: '', relationship: '', status: 'stable',
   })
 
   const handleChange = e => setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
@@ -23,7 +24,9 @@ export default function CreatePatient() {
       const { data: patient, error: patientError } = await supabase
         .from('patients').insert({ ...form, admin_id: user.id }).select().single()
       if (patientError) throw patientError
-      await supabase.from('patient_members').insert({ patient_id: patient.id, user_id: user.id, role: 'admin', status: 'active' })
+      await supabase.from('patient_members').insert({
+        patient_id: patient.id, user_id: user.id, role: 'admin', status: 'active'
+      })
       await supabase.from('profiles').update({ active_patient_id: patient.id }).eq('id', user.id)
       await fetchProfile(user.id)
       navigate('/dashboard')
@@ -42,14 +45,14 @@ export default function CreatePatient() {
             Fam<span style={{ color: 'var(--amber)' }}>ily</span>OS
           </div>
           <h1>Set up your loved one's profile</h1>
-          <p>This information helps personalize the AI features. You can edit it anytime.</p>
+          <p>This information helps personalize the AI features.</p>
         </div>
         {error && <div className="error-message">{error}</div>}
         <div className="card">
           <form onSubmit={handleSubmit}>
-            <p className="card-title">👤 Patient Information</p>
+            <p className="card-title">Patient Information</p>
             <div className="form-group">
-              <label>Patient's full name *</label>
+              <label>Patient full name *</label>
               <input name="name" value={form.name} onChange={handleChange} placeholder="Margaret Johnson" required />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -61,4 +64,61 @@ export default function CreatePatient() {
                 <label>Your relationship *</label>
                 <select name="relationship" value={form.relationship} onChange={handleChange} required>
                   <option value="">Select...</option>
-                  <option>Child</option><option>Spouse / Part
+                  <option>Child</option>
+                  <option>Spouse / Partner</option>
+                  <option>Parent</option>
+                  <option>Sibling</option>
+                  <option>Friend</option>
+                  <option>Other</option>
+                </select>
+              </div>
+            </div>
+            <div className="form-group">
+              <label>Current status</label>
+              <select name="status" value={form.status} onChange={handleChange}>
+                <option value="stable">Stable</option>
+                <option value="critical">Critical</option>
+                <option value="recovering">Recovering</option>
+                <option value="hospice">Hospice</option>
+                <option value="healthy">Healthy</option>
+              </select>
+            </div>
+            <div className="divider" />
+            <p className="card-title">Medical Information</p>
+            <div className="form-group">
+              <label>Primary diagnosis</label>
+              <input name="primary_diagnosis" value={form.primary_diagnosis} onChange={handleChange} placeholder="e.g. Stage 3 Breast Cancer" />
+            </div>
+            <div className="form-group">
+              <label>Other conditions</label>
+              <input name="other_conditions" value={form.other_conditions} onChange={handleChange} placeholder="e.g. Type 2 Diabetes" />
+            </div>
+            <div className="form-group">
+              <label>Allergies</label>
+              <input name="allergies" value={form.allergies} onChange={handleChange} placeholder="e.g. Penicillin, Shellfish" />
+            </div>
+            <div className="divider" />
+            <p className="card-title">Care Team</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="form-group">
+                <label>Primary doctor</label>
+                <input name="primary_doctor" value={form.primary_doctor} onChange={handleChange} placeholder="Dr. Sarah Williams" />
+              </div>
+              <div className="form-group">
+                <label>Doctor phone</label>
+                <input name="doctor_phone" value={form.doctor_phone} onChange={handleChange} placeholder="(305) 555-0100" />
+              </div>
+            </div>
+            <div className="form-group">
+              <label>Hospital / care facility</label>
+              <input name="hospital" value={form.hospital} onChange={handleChange} placeholder="Baptist Health South Florida" />
+            </div>
+            <button type="submit" className="btn btn-primary btn-lg" style={{ marginTop: 8 }} disabled={loading}>
+              {loading ? 'Setting up...' : 'Create profile & go to dashboard'}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  )
+}
