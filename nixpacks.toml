@@ -1,2 +1,0 @@
-[start]
-cmd = "npx vite preview --port $PORT --host"
