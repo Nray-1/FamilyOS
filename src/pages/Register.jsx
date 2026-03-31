@@ -20,7 +20,7 @@ export default function Register() {
       await signUp(email, password, fullName)
       navigate('/create-patient')
     } catch (err) {
-      setError(err.message || 'Something went wrong. Please try again.')
+      setError(err.message || 'Something went wrong.')
     } finally {
       setLoading(false)
     }
@@ -29,18 +29,13 @@ export default function Register() {
   return (
     <div className="auth-page">
       <div className="auth-brand">
-        <div className="brand-logo">Fam<span>ily</span>OS</div>
-        <p className="brand-tagline">Because your family deserves a better system than group texts and hope.</p>
-        <div className="brand-features">
-          {['Set up in minutes','Invite family & friends','Private layers for sensitive documents','Free to get started'].map(f => (
-            <div className="brand-feature" key={f}><div className="brand-feature-dot" />{f}</div>
-          ))}
-        </div>
+        <div className="brand-logo">FamilyOS</div>
+        <p className="brand-tagline">Because your family deserves better than group texts.</p>
       </div>
       <div className="auth-panel">
         <div className="auth-form-container">
           <h1>Create your account</h1>
-          <p className="auth-subtitle">You'll be the Admin — in full control of everything</p>
+          <p className="auth-subtitle">You will be the Admin in full control</p>
           {error && <div className="error-message">{error}</div>}
           <form onSubmit={handleSubmit}>
             <div className="form-group">
@@ -56,11 +51,11 @@ export default function Register() {
               <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" required />
             </div>
             <button type="submit" className="btn btn-primary btn-lg" disabled={loading}>
-              {loading ? 'Creating account...' : 'Create account & continue'}
+              {loading ? 'Creating account...' : 'Create account'}
             </button>
           </form>
           <div className="auth-footer">
-            Already have an account? <Link to="/login">Sign in</Link>
+            Have an account? <Link to="/login">Sign in</Link>
           </div>
         </div>
       </div>
