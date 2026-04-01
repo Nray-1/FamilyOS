@@ -25,17 +25,13 @@ export default function Vault({ patient }) {
   const [aiLoading, setAiLoading] = useState(false)
   const [uploadForm, setUploadForm] = useState({ name: '', category: 'medical', notes: '' })
   const [uploadMsg, setUploadMsg] = useState('')
-
-  // Lab upload state — just file + label + date
   const [labFile, setLabFile] = useState(null)
   const [labLabel, setLabLabel] = useState('')
   const [labDate, setLabDate] = useState('')
   const [labLoading, setLabLoading] = useState(false)
   const [labMsg, setLabMsg] = useState('')
-  const [analyzingDoc, setAnalyzingDoc] = useState(null)
   const [singleDocAnalysis, setSingleDocAnalysis] = useState({})
   const [singleDocLoading, setSingleDocLoading] = useState({})
-
   const fileRef = useRef(null)
   const labFileRef = useRef(null)
 
@@ -96,47 +92,37 @@ export default function Vault({ patient }) {
     }
   }
 
-  // Convert file to base64
-  const fileToBase64 = (file) => new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result.split(',')[1])
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-
   const uploadLabResult = async () => {
     if (!labFile || !labLabel) return
     setLabLoading(true)
     setLabMsg('')
     try {
-      // Upload file to storage
-     const files = Array.isArray(labFile) ? labFile : [labFile]
-const uploadedUrls = []
-const uploadedNames = []
+      const files = Array.isArray(labFile) ? labFile : [labFile]
+      const uploadedUrls = []
+      const uploadedNames = []
 
-for (const f of files) {
-  const ext = f.name.split('.').pop()
-  const path = `${patient.id}/labs/${Date.now()}-${f.name}`
-  await supabase.storage.from('vault').upload(path, f)
-  const { data: { publicUrl } } = supabase.storage.from('vault').getPublicUrl(path)
-  uploadedUrls.push(publicUrl)
-  uploadedNames.push(f.name)
-}
+      for (const f of files) {
+        const ext = f.name.split('.').pop()
+        const path = `${patient.id}/labs/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+        await supabase.storage.from('vault').upload(path, f)
+        const { data: { publicUrl } } = supabase.storage.from('vault').getPublicUrl(path)
+        uploadedUrls.push(publicUrl)
+        uploadedNames.push(f.name)
+      }
 
-await supabase.from('lab_results').insert({
-  patient_id: patient.id,
-  uploaded_by: user.id,
-  test_name: labLabel,
-  test_date: labDate || new Date().toISOString().split('T')[0],
-  results: 'Uploaded document — click "AI Analysis" to analyze',
-  file_url: uploadedUrls[0],
-  file_urls: uploadedUrls,
-  file_name: uploadedNames.join(', '),
-  file_type: files[0].type,
-})
+      await supabase.from('lab_results').insert({
+        patient_id: patient.id,
+        uploaded_by: user.id,
+        test_name: labLabel,
+        test_date: labDate || new Date().toISOString().split('T')[0],
+        results: 'Uploaded document — click "AI Analysis" to analyze',
+        file_url: uploadedUrls[0],
+        file_urls: uploadedUrls,
+        file_name: uploadedNames.join(', '),
+        file_type: files[0].type,
       })
 
-      setLabMsg('Lab document uploaded!')
+      setLabMsg(`${files.length} file${files.length > 1 ? 's' : ''} uploaded!`)
       setLabLabel('')
       setLabDate('')
       setLabFile(null)
@@ -150,35 +136,36 @@ await supabase.from('lab_results').insert({
     }
   }
 
-  // Analyze a single lab document by reading the file directly
   const analyzeSingleDoc = async (lab) => {
     setSingleDocLoading(prev => ({ ...prev, [lab.id]: true }))
     setSingleDocAnalysis(prev => ({ ...prev, [lab.id]: '' }))
     try {
-     let messageContent = []
-const urls = lab.file_urls || (lab.file_url ? [lab.file_url] : [])
+      let messageContent = []
+      const urls = lab.file_urls || (lab.file_url ? [lab.file_url] : [])
 
-if (urls.length > 0) {
-  for (const url of urls) {
-    const res = await fetch(url)
-    const blob = await res.blob()
-    const base64 = await new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result.split(',')[1])
-      reader.onerror = reject
-      reader.readAsDataURL(blob)
-    })
-    const mimeType = blob.type || 'image/jpeg'
-    if (mimeType === 'application/pdf') {
-      messageContent.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } })
-    } else {
-      messageContent.push({ type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } })
-    }
-  }
-  messageContent.push({ type: 'text', text: `Please analyze these lab results for ${patient.name}. There are ${urls.length} file(s) above. Extract all test values, identify what's normal vs abnormal, explain what each result means in plain language, and highlight anything that should be discussed with the doctor. Patient conditions: ${patient.primary_diagnosis || 'not specified'}, ${patient.other_conditions || 'none'}.` })
-} else {
-  messageContent = [{ type: 'text', text: `Analyze these lab results for ${patient.name}: ${lab.results}` }]
-}
+      if (urls.length > 0) {
+        for (const url of urls) {
+          const res = await fetch(url)
+          const blob = await res.blob()
+          const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result.split(',')[1])
+            reader.onerror = reject
+            reader.readAsDataURL(blob)
+          })
+          const mimeType = blob.type || 'image/jpeg'
+          if (mimeType === 'application/pdf') {
+            messageContent.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } })
+          } else {
+            messageContent.push({ type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } })
+          }
+        }
+        messageContent.push({
+          type: 'text',
+          text: `Please analyze these lab results for ${patient.name}. There are ${urls.length} file(s) above. Extract all test values, identify what's normal vs abnormal, explain what each result means in plain language, and highlight anything that should be discussed with the doctor. Patient conditions: ${patient.primary_diagnosis || 'not specified'}, ${patient.other_conditions || 'none'}.`
+        })
+      } else {
+        messageContent = [{ type: 'text', text: `Analyze these lab results for ${patient.name}: ${lab.results}` }]
       }
 
       const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -205,16 +192,14 @@ if (urls.length > 0) {
     }
   }
 
-  // Analyze all lab results together for trends
   const analyzeLabTrends = async () => {
     if (labResults.length === 0) return
     setAiLoading(true)
     setShowAIModal(true)
     setAiAnalysis('')
     try {
-      // For trend analysis, we send all file URLs + context
       const labSummary = labResults.map(r =>
-        `Document: ${r.test_name} | Date: ${r.test_date} | File: ${r.file_url || 'no file'}`
+        `Document: ${r.test_name} | Date: ${r.test_date} | Files: ${r.file_name || 'no file'}`
       ).join('\n')
 
       const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -229,7 +214,7 @@ if (urls.length > 0) {
           model: 'claude-sonnet-4-20250514',
           max_tokens: 1500,
           system: `You are a compassionate medical assistant helping a family caregiver understand their loved one's lab results over time. Patient: ${patient.name}, Conditions: ${patient.primary_diagnosis || 'not specified'}, ${patient.other_conditions || ''}. Analyze the lab results, identify trends over time, flag anything concerning, and suggest questions to ask the doctor. Be warm and avoid medical jargon. Format: Summary, Trends to Watch, Questions to Ask Your Doctor.`,
-          messages: [{ role: 'user', content: `Here are ${patient.name}'s lab documents over time:\n\n${labSummary}\n\nBased on the document names, dates, and context, provide trend analysis and guidance. Note: encourage the family to use the individual "AI Analysis" button on each document for detailed per-document analysis.` }]
+          messages: [{ role: 'user', content: `Here are ${patient.name}'s lab documents over time:\n\n${labSummary}\n\nProvide trend analysis and guidance. Encourage the family to use the individual "AI Analysis" button on each document for detailed per-document analysis.` }]
         })
       })
       const data = await response.json()
@@ -306,19 +291,16 @@ if (urls.length > 0) {
             )}
           </div>
 
-          {/* How it works banner */}
           <div style={{ background: 'var(--sage-light)', border: '1px solid var(--sage)', borderRadius: 'var(--radius-sm)', padding: '12px 16px', marginBottom: 20, fontSize: '0.85rem', color: 'var(--sage-dark)', display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: '1.2rem' }}>💡</span>
-            <div>
-              <strong>Just upload your document.</strong> Upload any PDF or image of lab results and AI will read and analyze it for you — no manual data entry needed.
-            </div>
+            <div><strong>Just upload your files.</strong> Select one or multiple screenshots/PDFs — AI will read and analyze them all together. No typing required.</div>
           </div>
 
           {labResults.length === 0 ? (
             <div className="card"><div className="empty-state">
               <p style={{ fontSize: '3rem', marginBottom: 12 }}>🔬</p>
               <h3>No lab results yet</h3>
-              <p style={{ marginBottom: 16 }}>Upload a PDF or photo of any lab report, bloodwork, or imaging result. AI will read and analyze it.</p>
+              <p style={{ marginBottom: 16 }}>Upload one or multiple screenshots or a PDF of any lab report. AI will read and analyze it.</p>
               <button className="btn btn-primary" style={{ width: 'auto' }} onClick={() => setShowLabModal(true)}>Upload First Lab Result</button>
             </div></div>
           ) : (
@@ -331,7 +313,9 @@ if (urls.length > 0) {
                       <div>
                         <div style={{ fontWeight: 600, color: 'var(--navy)', fontSize: '0.95rem' }}>{lab.test_name}</div>
                         <div style={{ fontSize: '0.78rem', color: 'var(--slate-light)', marginTop: 2 }}>
-                          {formatDate(lab.test_date)}{lab.file_name ? ` · ${lab.file_name}` : ''}
+                          {formatDate(lab.test_date)}
+                          {lab.file_name && ` · ${lab.file_name}`}
+                          {lab.file_urls?.length > 1 && ` (${lab.file_urls.length} files)`}
                         </div>
                       </div>
                     </div>
@@ -346,7 +330,6 @@ if (urls.length > 0) {
                     </div>
                   </div>
 
-                  {/* AI Analysis result */}
                   {singleDocLoading[lab.id] && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px', background: 'var(--cream)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
                       <div className="spinner" style={{ width: 20, height: 20, borderWidth: 2, flexShrink: 0 }} />
@@ -411,7 +394,7 @@ if (urls.length > 0) {
         </div>
       )}
 
-      {/* Upload Lab Result Modal — simplified */}
+      {/* Upload Lab Result Modal */}
       {showLabModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
           onClick={e => { if (e.target === e.currentTarget) setShowLabModal(false) }}>
@@ -422,42 +405,42 @@ if (urls.length > 0) {
             </div>
 
             <div style={{ background: 'var(--sage-light)', border: '1px solid var(--sage)', borderRadius: 'var(--radius-sm)', padding: '12px 14px', marginBottom: 20, fontSize: '0.82rem', color: 'var(--sage-dark)' }}>
-              📄 Just upload the document — AI will read and analyze it for you. No typing required.
+              📄 Select one or multiple screenshots/PDFs — AI will read them all together. No typing required.
             </div>
 
             {labMsg && <div className={labMsg.includes('failed') ? 'error-message' : 'success-message'}>{labMsg}</div>}
 
             <div className="form-group">
               <label>Label *</label>
-              <input
-                value={labLabel}
-                onChange={e => setLabLabel(e.target.value)}
-                placeholder="e.g. CBC Bloodwork, MRI Results, Pathology Report"
-              />
+              <input value={labLabel} onChange={e => setLabLabel(e.target.value)} placeholder="e.g. CBC Bloodwork March 2026, MRI Results" />
             </div>
             <div className="form-group">
               <label>Test date</label>
               <input type="date" value={labDate} onChange={e => setLabDate(e.target.value)} />
             </div>
             <div className="form-group">
-              <label>Upload document *</label>
+              <label>Upload files * (select multiple if needed)</label>
               <input
-  type="file"
-  ref={labFileRef}
-  accept=".pdf,.jpg,.jpeg,.png"
-  multiple
-  style={{ padding: '8px 0' }}
-  onChange={e => setLabFile(Array.from(e.target.files))}
-/>
+                type="file"
+                ref={labFileRef}
+                accept=".pdf,.jpg,.jpeg,.png"
+                multiple
+                style={{ padding: '8px 0' }}
+                onChange={e => setLabFile(Array.from(e.target.files))}
               />
               <div style={{ fontSize: '0.75rem', color: 'var(--slate-light)', marginTop: 4 }}>
-                PDF or image (JPG, PNG). AI will read the document directly.
+                Hold Ctrl (or Cmd on Mac) to select multiple files at once
               </div>
+              {labFile && labFile.length > 0 && (
+                <div style={{ marginTop: 8, fontSize: '0.78rem', color: 'var(--sage-dark)', background: 'var(--sage-light)', padding: '8px 12px', borderRadius: 6 }}>
+                  ✓ {labFile.length} file{labFile.length > 1 ? 's' : ''} selected: {labFile.map(f => f.name).join(', ')}
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: 12 }}>
               <button className="btn btn-secondary" onClick={() => setShowLabModal(false)} style={{ flex: 1 }}>Cancel</button>
-              <button className="btn btn-primary" onClick={uploadLabResult} disabled={labLoading || !labLabel || !labFile} style={{ flex: 1 }}>
+              <button className="btn btn-primary" onClick={uploadLabResult} disabled={labLoading || !labLabel || !labFile?.length} style={{ flex: 1 }}>
                 {labLoading ? 'Uploading...' : 'Upload'}
               </button>
             </div>
@@ -523,7 +506,7 @@ if (urls.length > 0) {
             ) : (
               <div>
                 <div style={{ background: 'var(--amber-light)', border: '1px solid var(--amber)', borderRadius: 'var(--radius-sm)', padding: '12px 16px', marginBottom: 20, fontSize: '0.82rem', color: 'var(--slate)' }}>
-                  ⚠️ For informational purposes only. Always discuss results with your doctor. For detailed per-document analysis, use the "✨ AI Analysis" button on each individual result.
+                  ⚠️ For informational purposes only. Always discuss results with your doctor. Use the "✨ AI Analysis" button on each individual result for detailed per-document analysis.
                 </div>
                 <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, color: 'var(--slate)', fontSize: '0.9rem' }}>{aiAnalysis}</div>
               </div>
