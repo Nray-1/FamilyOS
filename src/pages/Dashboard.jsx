@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import UpdateFeed from './UpdateFeed'
 import Vault from './Vault'
+import CarePlanner from './CarePlanner'
 
 export default function Dashboard() {
   const { user, profile, signOut } = useAuth()
@@ -367,6 +368,11 @@ export default function Dashboard() {
           <Vault patient={patient} />
         )}
 
+        {/* ── CARE PLANNER ── */}
+        {activeSection === 'care' && patient && (
+          <CarePlanner patient={patient} />
+        )}
+
         {/* ── CARE TEAM (admin only) ── */}
         {activeSection === 'team' && (
           <div>
@@ -423,7 +429,7 @@ export default function Dashboard() {
         )}
 
         {/* ── COMING SOON for everything else ── */}
-        {!['home', 'updates', 'team', 'vault'].includes(activeSection) && (
+        {!['home', 'updates', 'team', 'vault', 'care'].includes(activeSection) && (
           <div>
             <div className="page-header">
               <h1 className="page-title">{navItems.find(n => n.id === activeSection)?.label}</h1>
