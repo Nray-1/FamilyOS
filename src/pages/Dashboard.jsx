@@ -5,6 +5,7 @@ import UpdateFeed from './UpdateFeed'
 import Vault from './Vault'
 import CarePlanner from './CarePlanner'
 import SupportBoard from './SupportBoard'
+import MemoryWall from './MemoryWall'
 
 export default function Dashboard() {
   const { user, profile, signOut } = useAuth()
@@ -379,6 +380,11 @@ export default function Dashboard() {
           <SupportBoard patient={patient} userRole={userRole} />
         )}
 
+        {/* ── MEMORY WALL ── */}
+        {activeSection === 'media' && patient && (
+          <MemoryWall patient={patient} userRole={userRole} />
+        )}
+
         {/* ── CARE TEAM (admin only) ── */}
         {activeSection === 'team' && (
           <div>
@@ -435,7 +441,7 @@ export default function Dashboard() {
         )}
 
         {/* ── COMING SOON for everything else ── */}
-        {!['home', 'updates', 'team', 'vault', 'care', 'support'].includes(activeSection) && (
+        {!['home', 'updates', 'team', 'vault', 'care', 'support', 'media'].includes(activeSection) && (
           <div>
             <div className="page-header">
               <h1 className="page-title">{navItems.find(n => n.id === activeSection)?.label}</h1>
