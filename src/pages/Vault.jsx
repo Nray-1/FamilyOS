@@ -110,21 +110,30 @@ export default function Vault({ patient }) {
     setLabMsg('')
     try {
       // Upload file to storage
-      const ext = labFile.name.split('.').pop()
-      const path = `${patient.id}/labs/${Date.now()}.${ext}`
-      await supabase.storage.from('vault').upload(path, labFile)
-      const { data: { publicUrl } } = supabase.storage.from('vault').getPublicUrl(path)
+     const files = Array.isArray(labFile) ? labFile : [labFile]
+const uploadedUrls = []
+const uploadedNames = []
 
-      // Save to DB with minimal info — AI will read the file
-      await supabase.from('lab_results').insert({
-        patient_id: patient.id,
-        uploaded_by: user.id,
-        test_name: labLabel,
-        test_date: labDate || new Date().toISOString().split('T')[0],
-        results: 'Uploaded document — click "AI Analysis" to analyze',
-        file_url: publicUrl,
-        file_name: labFile.name,
-        file_type: labFile.type,
+for (const f of files) {
+  const ext = f.name.split('.').pop()
+  const path = `${patient.id}/labs/${Date.now()}-${f.name}`
+  await supabase.storage.from('vault').upload(path, f)
+  const { data: { publicUrl } } = supabase.storage.from('vault').getPublicUrl(path)
+  uploadedUrls.push(publicUrl)
+  uploadedNames.push(f.name)
+}
+
+await supabase.from('lab_results').insert({
+  patient_id: patient.id,
+  uploaded_by: user.id,
+  test_name: labLabel,
+  test_date: labDate || new Date().toISOString().split('T')[0],
+  results: 'Uploaded document — click "AI Analysis" to analyze',
+  file_url: uploadedUrls[0],
+  file_urls: uploadedUrls,
+  file_name: uploadedNames.join(', '),
+  file_type: files[0].type,
+})
       })
 
       setLabMsg('Lab document uploaded!')
