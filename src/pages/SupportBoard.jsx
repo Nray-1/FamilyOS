@@ -309,7 +309,7 @@ export default function SupportBoard({ patient, userRole }) {
             <div style={{ fontSize: '0.875rem', color: 'var(--slate-light)' }}>
               {isAdmin ? 'Review and approve visit requests.' : 'Request a time to visit. Admin will approve.'}
             </div>
-            {!isAdmin && <button className="btn btn-primary btn-sm" onClick={() => setShowVisitModal(true)}>Request a Visit</button>}
+            <button className="btn btn-primary btn-sm" onClick={() => setShowVisitModal(true)}>+ Schedule a Visit</button>
           </div>
 
           {visits.length === 0 ? (
@@ -317,7 +317,7 @@ export default function SupportBoard({ patient, userRole }) {
               <p style={{ fontSize: '3rem', marginBottom: 12 }}>🏠</p>
               <h3>No visit requests yet</h3>
               <p style={{ marginBottom: 16 }}>{isAdmin ? 'Community members can request visits here.' : 'Request a time to visit — the admin will approve it.'}</p>
-              {!isAdmin && <button className="btn btn-primary" style={{ width: 'auto' }} onClick={() => setShowVisitModal(true)}>Request a Visit</button>}
+              <button className="btn btn-primary" style={{ width: 'auto' }} onClick={() => setShowVisitModal(true)}>Schedule a Visit</button>
             </div></div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
