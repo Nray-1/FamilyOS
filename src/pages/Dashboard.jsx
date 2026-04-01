@@ -13,6 +13,10 @@ export default function Dashboard() {
   const [inviteRole, setInviteRole] = useState('inner_circle')
   const [inviteMsg, setInviteMsg] = useState('')
   const [inviteLoading, setInviteLoading] = useState(false)
+  const [showEditPatient, setShowEditPatient] = useState(false)
+  const [editForm, setEditForm] = useState({})
+  const [editLoading, setEditLoading] = useState(false)
+  const [editMsg, setEditMsg] = useState('')
 
   // Determine role - admins created the patient, others are members
   const userRole = profile?.system_role || 'admin' // fallback to admin for existing users
@@ -32,6 +36,32 @@ export default function Dashboard() {
   const fetchPatient = async (id) => {
     const { data } = await supabase.from('patients').select('*').eq('id', id).single()
     setPatient(data)
+    if (data) setEditForm({
+      name: data.name || '',
+      date_of_birth: data.date_of_birth || '',
+      primary_diagnosis: data.primary_diagnosis || '',
+      other_conditions: data.other_conditions || '',
+      allergies: data.allergies || '',
+      primary_doctor: data.primary_doctor || '',
+      doctor_phone: data.doctor_phone || '',
+      hospital: data.hospital || '',
+      status: data.status || 'stable',
+    })
+  }
+
+  const savePatient = async () => {
+    setEditLoading(true)
+    setEditMsg('')
+    try {
+      await supabase.from('patients').update(editForm).eq('id', patient.id)
+      await fetchPatient(patient.id)
+      setEditMsg('Saved!')
+      setTimeout(() => { setShowEditPatient(false); setEditMsg('') }, 1000)
+    } catch {
+      setEditMsg('Failed to save.')
+    } finally {
+      setEditLoading(false)
+    }
   }
 
   const fetchMembers = async (id) => {
@@ -115,7 +145,27 @@ export default function Dashboard() {
         {patient && (
           <div className="sidebar-patient">
             <div className="patient-card">
-              <div className="patient-name">{patient.name}</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div className="patient-name">{patient.name}</div>
+                {isAdmin && (
+                  <button
+                    onClick={() => setShowEditPatient(true)}
+                    title="Edit patient"
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      padding: '2px 4px', borderRadius: 4, color: 'rgba(255,255,255,0.4)',
+                      display: 'flex', alignItems: 'center', transition: 'color 0.15s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.9)'}
+                    onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.4)'}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                  </button>
+                )}
+              </div>
               <div className="patient-status">
                 <div className="status-dot" style={{ background: patient.status === 'critical' ? '#FC8181' : '#68D391' }} />
                 {patient.status}
@@ -383,6 +433,65 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+
+      {/* Edit Patient Modal */}
+      {showEditPatient && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24
+        }} onClick={e => { if (e.target === e.currentTarget) setShowEditPatient(false) }}>
+          <div style={{
+            background: 'white', borderRadius: 'var(--radius)', padding: 32,
+            width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto',
+            boxShadow: 'var(--shadow-lg)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', color: 'var(--navy)' }}>Edit Patient Profile</h2>
+              <button onClick={() => setShowEditPatient(false)} style={{
+                background: 'none', border: 'none', fontSize: '1.4rem', cursor: 'pointer', color: 'var(--slate-light)'
+              }}>×</button>
+            </div>
+
+            {editMsg && <div className={editMsg === 'Saved!' ? 'success-message' : 'error-message'}>{editMsg}</div>}
+
+            {[
+              { label: 'Full name', key: 'name' },
+              { label: 'Primary diagnosis', key: 'primary_diagnosis' },
+              { label: 'Other conditions', key: 'other_conditions' },
+              { label: 'Allergies', key: 'allergies' },
+              { label: 'Primary doctor', key: 'primary_doctor' },
+              { label: 'Doctor phone', key: 'doctor_phone' },
+              { label: 'Hospital / care facility', key: 'hospital' },
+            ].map(field => (
+              <div className="form-group" key={field.key}>
+                <label>{field.label}</label>
+                <input
+                  value={editForm[field.key] || ''}
+                  onChange={e => setEditForm(prev => ({ ...prev, [field.key]: e.target.value }))}
+                />
+              </div>
+            ))}
+
+            <div className="form-group">
+              <label>Current status</label>
+              <select value={editForm.status || 'stable'} onChange={e => setEditForm(prev => ({ ...prev, status: e.target.value }))}>
+                <option value="stable">Stable</option>
+                <option value="critical">Critical</option>
+                <option value="recovering">Recovering</option>
+                <option value="hospice">Hospice</option>
+                <option value="healthy">Healthy</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+              <button className="btn btn-secondary" onClick={() => setShowEditPatient(false)} style={{ flex: 1 }}>Cancel</button>
+              <button className="btn btn-primary" onClick={savePatient} disabled={editLoading} style={{ flex: 1 }}>
+                {editLoading ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
