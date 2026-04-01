@@ -97,7 +97,47 @@ export default function Dashboard() {
         token,
         status: 'pending'
       })
-      setInviteMsg('Invite sent to ' + inviteEmail)
+
+      const inviteUrl = `${window.location.origin}/invite/${token}`
+      const roleName = inviteRole === 'inner_circle' ? 'Inner Circle' : 'Community'
+
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_RESEND_API_KEY}`
+        },
+        body: JSON.stringify({
+          from: 'CaringCircle <onboarding@resend.dev>',
+          to: [inviteEmail],
+          subject: `You've been invited to ${patient.name}'s CaringCircle`,
+          html: `
+            <div style="font-family: Georgia, serif; max-width: 560px; margin: 0 auto; padding: 40px 24px; color: #1E2D3D;">
+              <div style="font-size: 1.8rem; font-weight: 700; color: #1E2D3D; margin-bottom: 8px;">CaringCircle</div>
+              <div style="height: 3px; background: #6B8F71; width: 48px; margin-bottom: 32px;"></div>
+              <h2 style="font-size: 1.4rem; margin-bottom: 16px;">You've been invited</h2>
+              <p style="color: #4A5568; line-height: 1.7; margin-bottom: 16px;">
+                <strong>${profile?.full_name || 'Someone'}</strong> has invited you to join <strong>${patient.name}</strong>'s care circle on CaringCircle as a <strong>${roleName}</strong> member.
+              </p>
+              <p style="color: #4A5568; line-height: 1.7; margin-bottom: 32px;">
+                CaringCircle helps families coordinate care, share updates, and support their loved ones together.
+              </p>
+              <a href="${inviteUrl}" style="display: inline-block; background: #6B8F71; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 1rem; margin-bottom: 32px;">
+                Accept Invitation
+              </a>
+              <p style="color: #718096; font-size: 0.85rem; line-height: 1.6;">
+                If the button doesn't work, copy and paste this link:<br/>
+                <a href="${inviteUrl}" style="color: #4A6B50;">${inviteUrl}</a>
+              </p>
+              <div style="margin-top: 40px; padding-top: 24px; border-top: 1px solid #E8E2D9; color: #718096; font-size: 0.8rem;">
+                You received this email because someone invited you to CaringCircle. If you don't know who sent this, you can safely ignore it.
+              </div>
+            </div>
+          `
+        })
+      })
+
+      setInviteMsg('✓ Invite email sent to ' + inviteEmail)
       setInviteEmail('')
     } catch {
       setInviteMsg('Failed to send invite.')
@@ -144,7 +184,7 @@ export default function Dashboard() {
     <div className="app-layout">
       <aside className="sidebar">
         <div className="sidebar-header">
-          <div className="sidebar-logo">FamilyOS</div>
+          <div className="sidebar-logo">CaringCircle</div>
         </div>
         {patient && (
           <div className="sidebar-patient">
