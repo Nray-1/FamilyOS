@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const DOCUMENTS = [
   {
@@ -9,6 +9,8 @@ const DOCUMENTS = [
     why: 'Without a DNR, medical staff are legally required to attempt resuscitation, even if it goes against your loved one\'s wishes.',
     howToGet: 'Talk to the primary doctor — they can issue one. It must be signed by a physician and kept accessible at home and at the hospital.',
     urgency: 'high',
+    businessSearch: 'hospice palliative care',
+    businessLabel: 'Hospice & Palliative Care Providers',
   },
   {
     id: 'advance_directive',
@@ -18,6 +20,8 @@ const DOCUMENTS = [
     why: 'It removes the burden of impossible decisions from your family during the most stressful moments.',
     howToGet: 'Download your state\'s form at CaringInfo.org (free). Have it signed, witnessed, and give copies to the doctor and hospital.',
     urgency: 'high',
+    businessSearch: 'elder law attorney',
+    businessLabel: 'Elder Law Attorneys',
   },
   {
     id: 'poa',
@@ -27,6 +31,8 @@ const DOCUMENTS = [
     why: 'Without POA, family members may be unable to access bank accounts, pay bills, or make legal decisions — even in emergencies.',
     howToGet: 'A local attorney can prepare this for $150–$500. Some legal aid organizations offer it free for low-income families. It must be notarized.',
     urgency: 'high',
+    businessSearch: 'estate planning attorney',
+    businessLabel: 'Estate Planning Attorneys',
   },
   {
     id: 'will',
@@ -36,6 +42,8 @@ const DOCUMENTS = [
     why: 'Without a will, the state decides who gets what — which can cause family conflict and delays of 1–2 years.',
     howToGet: 'An estate attorney can prepare a simple will for $300–$1,000. Online services like Trust & Will or LegalZoom offer lower-cost options.',
     urgency: 'medium',
+    businessSearch: 'estate planning attorney notary',
+    businessLabel: 'Estate Attorneys & Notaries',
   },
   {
     id: 'insurance',
@@ -45,6 +53,8 @@ const DOCUMENTS = [
     why: 'Families often lose thousands in unclaimed benefits simply because they cannot find policy information after a loved one passes.',
     howToGet: 'Gather all insurance cards, policy documents, and billing statements. Upload them to The Vault in CaringCircle.',
     urgency: 'medium',
+    businessSearch: 'insurance agent life health',
+    businessLabel: 'Insurance Agents',
   },
   {
     id: 'financial',
@@ -54,6 +64,8 @@ const DOCUMENTS = [
     why: 'An estimated $58 billion in unclaimed financial assets exist in the U.S. — mostly because families did not know accounts existed.',
     howToGet: 'Create a secure document listing all accounts, institutions, and approximate balances. Store in The Vault. Do NOT include passwords.',
     urgency: 'medium',
+    businessSearch: 'financial advisor wealth management',
+    businessLabel: 'Financial Advisors',
   },
   {
     id: 'beneficiaries',
@@ -63,6 +75,8 @@ const DOCUMENTS = [
     why: 'Beneficiary designations override what is written in a will — outdated designations frequently cause assets to go to the wrong person.',
     howToGet: 'Contact each financial institution and insurance company to review and update beneficiary designations.',
     urgency: 'medium',
+    businessSearch: 'financial planner estate attorney',
+    businessLabel: 'Financial Planners & Attorneys',
   },
   {
     id: 'funeral',
@@ -72,6 +86,8 @@ const DOCUMENTS = [
     why: 'Making these decisions in advance prevents families from spending thousands more than necessary under emotional duress.',
     howToGet: 'Have a direct conversation with your loved one and write their wishes down. Some families use a funeral home for pre-planning.',
     urgency: 'low',
+    businessSearch: 'funeral home cremation services',
+    businessLabel: 'Funeral Homes & Cremation Services',
   },
 ]
 
@@ -87,6 +103,67 @@ export default function DocumentPlanner({ patient }) {
   const [aiLoading, setAiLoading] = useState({})
   const [question, setQuestion] = useState({})
   const [activeFilter, setActiveFilter] = useState('all')
+  const [businesses, setBusinesses] = useState({})
+  const [bizLoading, setBizLoading] = useState({})
+  const [bizError, setBizError] = useState({})
+  const mapsLoaded = useRef(false)
+
+  useEffect(() => {
+    if (mapsLoaded.current) return
+    const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+    if (!key) return
+    if (document.querySelector('script[src*="maps.googleapis.com"]')) {
+      mapsLoaded.current = true
+      return
+    }
+    const script = document.createElement('script')
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places`
+    script.async = true
+    script.onload = () => { mapsLoaded.current = true }
+    document.head.appendChild(script)
+  }, [])
+
+  const findBusinesses = async (doc) => {
+    if (!patient?.zip_code) {
+      setBizError(prev => ({ ...prev, [doc.id]: 'No zip code on file. Add it via the pencil icon next to the patient name in the sidebar.' }))
+      return
+    }
+    setBizLoading(prev => ({ ...prev, [doc.id]: true }))
+    setBizError(prev => ({ ...prev, [doc.id]: null }))
+    setBusinesses(prev => ({ ...prev, [doc.id]: [] }))
+
+    try {
+      const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+      const geocodeRes = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${patient.zip_code}&key=${key}`
+      )
+      const geocodeData = await geocodeRes.json()
+      if (!geocodeData.results?.length) throw new Error('Could not find location for zip code ' + patient.zip_code)
+
+      const { lat, lng } = geocodeData.results[0].geometry.location
+      const placesRes = await fetch(
+        `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(doc.businessSearch)}&location=${lat},${lng}&radius=16000&key=${key}`
+      )
+      const placesData = await placesRes.json()
+
+      if (placesData.status === 'REQUEST_DENIED') throw new Error('Places API not enabled. Enable it in Google Cloud Console.')
+      if (placesData.status === 'ZERO_RESULTS') throw new Error('No results found near ' + patient.zip_code)
+
+      const results = (placesData.results || []).slice(0, 10).map(p => ({
+        name: p.name,
+        address: p.formatted_address,
+        rating: p.rating,
+        totalRatings: p.user_ratings_total,
+        placeId: p.place_id,
+      }))
+
+      setBusinesses(prev => ({ ...prev, [doc.id]: results }))
+    } catch (err) {
+      setBizError(prev => ({ ...prev, [doc.id]: err.message || 'Search failed. Please try again.' }))
+    } finally {
+      setBizLoading(prev => ({ ...prev, [doc.id]: false }))
+    }
+  }
 
   const toggleItem = (id, status) => {
     const updated = { ...checklist, [id]: status }
@@ -110,9 +187,7 @@ export default function DocumentPlanner({ patient }) {
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 1000,
-          system: `You are a compassionate advisor helping a family caregiver navigate important legal and medical documents for their loved one named ${patient?.name}.
-Be warm, clear, and practical. Avoid overwhelming legal jargon. Always remind them to consult an attorney or doctor for their specific situation.
-Keep responses concise — 2-4 paragraphs maximum.`,
+          system: `You are a compassionate advisor helping a family caregiver navigate important legal and medical documents for their loved one named ${patient?.name}. Be warm, clear, and practical. Always remind them to consult an attorney or doctor. Keep responses concise — 2-4 paragraphs maximum.`,
           messages: [{ role: 'user', content: `About the ${doc.title}: ${q}` }]
         })
       })
@@ -127,9 +202,7 @@ Keep responses concise — 2-4 paragraphs maximum.`,
   }
 
   const completedCount = Object.values(checklist).filter(v => v === 'done').length
-  const totalCount = DOCUMENTS.length
-  const progressPct = Math.round((completedCount / totalCount) * 100)
-
+  const progressPct = Math.round((completedCount / DOCUMENTS.length) * 100)
   const urgencyColor = { high: '#FC8181', medium: '#D4956A', low: '#68D391' }
   const urgencyLabel = { high: 'High Priority', medium: 'Medium Priority', low: 'Lower Priority' }
 
@@ -138,6 +211,12 @@ Keep responses concise — 2-4 paragraphs maximum.`,
     : activeFilter === 'missing' ? DOCUMENTS.filter(d => checklist[d.id] !== 'done')
     : DOCUMENTS.filter(d => d.urgency === activeFilter)
 
+  const renderStars = (rating) => {
+    if (!rating) return null
+    const full = Math.round(rating)
+    return '★'.repeat(full) + '☆'.repeat(5 - full)
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -145,48 +224,28 @@ Keep responses concise — 2-4 paragraphs maximum.`,
         <p className="page-subtitle">Make sure {patient?.name}'s family has everything in place</p>
       </div>
 
-      {/* Progress card */}
       <div className="card" style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div>
             <div style={{ fontWeight: 600, color: 'var(--navy)', marginBottom: 4 }}>Preparation Progress</div>
-            <div style={{ fontSize: '0.875rem', color: 'var(--slate-light)' }}>
-              {completedCount} of {totalCount} documents confirmed
-            </div>
+            <div style={{ fontSize: '0.875rem', color: 'var(--slate-light)' }}>{completedCount} of {DOCUMENTS.length} documents confirmed</div>
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: 700, color: progressPct === 100 ? 'var(--sage-dark)' : 'var(--navy)', fontFamily: 'var(--font-display)' }}>
-            {progressPct}%
-          </div>
+          <div style={{ fontSize: '2rem', fontWeight: 700, color: progressPct === 100 ? 'var(--sage-dark)' : 'var(--navy)', fontFamily: 'var(--font-display)' }}>{progressPct}%</div>
         </div>
         <div style={{ height: 10, background: 'var(--cream)', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }}>
-          <div style={{
-            height: '100%', borderRadius: 10,
-            background: progressPct === 100 ? 'var(--sage)' : 'linear-gradient(90deg, var(--sage), var(--amber))',
-            width: `${progressPct}%`, transition: 'width 0.5s ease'
-          }} />
+          <div style={{ height: '100%', borderRadius: 10, background: 'linear-gradient(90deg, var(--sage), var(--amber))', width: `${progressPct}%`, transition: 'width 0.5s ease' }} />
         </div>
-        {progressPct === 100 && (
-          <div style={{ marginTop: 12, color: 'var(--sage-dark)', fontWeight: 600, fontSize: '0.875rem' }}>
-            Your family is fully prepared. Well done.
-          </div>
-        )}
-        {completedCount === 0 && (
-          <div style={{ marginTop: 12, color: 'var(--slate-light)', fontSize: '0.875rem' }}>
-            Start by reviewing each document below and marking what you have in place.
+        {!patient?.zip_code && (
+          <div style={{ marginTop: 10, fontSize: '0.82rem', color: 'var(--amber)' }}>
+            ⚠️ Add a zip code to the patient profile to enable local business search
           </div>
         )}
       </div>
 
-      {/* Disclaimer */}
-      <div style={{
-        background: 'var(--amber-light)', border: '1px solid var(--amber)',
-        borderRadius: 'var(--radius-sm)', padding: '12px 16px', marginBottom: 24,
-        fontSize: '0.82rem', color: 'var(--slate)'
-      }}>
-        This planner is for organizational purposes only and does not constitute legal or medical advice. Always consult a licensed attorney or physician for your specific situation.
+      <div style={{ background: 'var(--amber-light)', border: '1px solid var(--amber)', borderRadius: 'var(--radius-sm)', padding: '12px 16px', marginBottom: 24, fontSize: '0.82rem', color: 'var(--slate)' }}>
+        For organizational purposes only — not legal or medical advice. Always consult a licensed attorney or physician.
       </div>
 
-      {/* Filter tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
         {[
           { id: 'all', label: 'All Documents' },
@@ -201,83 +260,47 @@ Keep responses concise — 2-4 paragraphs maximum.`,
             background: activeFilter === f.id ? 'var(--sage-light)' : 'white',
             color: activeFilter === f.id ? 'var(--sage-dark)' : 'var(--slate)',
             fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font-body)'
-          }}>
-            {f.label}
-          </button>
+          }}>{f.label}</button>
         ))}
       </div>
 
-      {/* Document cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {filtered.map(doc => {
-          const status = checklist[doc.id]
-          const isDone = status === 'done'
+          const isDone = checklist[doc.id] === 'done'
           const isExpanded = expandedDoc === doc.id
+          const docBiz = businesses[doc.id] || []
 
           return (
-            <div key={doc.id} className="card" style={{
-              padding: 0, overflow: 'hidden',
-              opacity: isDone ? 0.85 : 1,
-              border: isDone ? '1px solid var(--sage)' : '1px solid var(--border)'
-            }}>
+            <div key={doc.id} className="card" style={{ padding: 0, overflow: 'hidden', opacity: isDone ? 0.85 : 1, border: isDone ? '1px solid var(--sage)' : '1px solid var(--border)' }}>
               <div style={{ height: 3, background: isDone ? 'var(--sage)' : urgencyColor[doc.urgency] }} />
               <div style={{ padding: '20px 24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flex: 1 }}>
-                    <div style={{
-                      width: 44, height: 44, borderRadius: 10, flexShrink: 0,
-                      background: isDone ? 'var(--sage-light)' : 'var(--cream)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: isDone ? '1.1rem' : '1.3rem',
-                      border: '1px solid var(--border)', color: isDone ? 'var(--sage-dark)' : 'inherit'
-                    }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, background: isDone ? 'var(--sage-light)' : 'var(--cream)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', border: '1px solid var(--border)' }}>
                       {isDone ? '✓' : doc.emoji}
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, flexWrap: 'wrap' }}>
                         <div style={{ fontWeight: 600, color: 'var(--navy)', fontSize: '0.95rem' }}>{doc.title}</div>
-                        {!isDone && (
-                          <span style={{
-                            fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 20,
-                            background: urgencyColor[doc.urgency] + '22',
-                            color: urgencyColor[doc.urgency],
-                            border: `1px solid ${urgencyColor[doc.urgency]}44`
-                          }}>
-                            {urgencyLabel[doc.urgency]}
-                          </span>
-                        )}
-                        {isDone && (
-                          <span style={{
-                            fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 20,
-                            background: 'var(--sage-light)', color: 'var(--sage-dark)',
-                            border: '1px solid var(--sage)'
-                          }}>
-                            Confirmed
-                          </span>
-                        )}
+                        <span style={{ fontSize: '0.7rem', fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: isDone ? 'var(--sage-light)' : urgencyColor[doc.urgency] + '22', color: isDone ? 'var(--sage-dark)' : urgencyColor[doc.urgency], border: `1px solid ${isDone ? 'var(--sage)' : urgencyColor[doc.urgency] + '44'}` }}>
+                          {isDone ? 'Confirmed' : urgencyLabel[doc.urgency]}
+                        </span>
                       </div>
                       <div style={{ fontSize: '0.85rem', color: 'var(--slate)', lineHeight: 1.5 }}>{doc.description}</div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginLeft: 16, flexShrink: 0 }}>
-                    <button onClick={() => setExpandedDoc(isExpanded ? null : doc.id)} className="btn btn-secondary btn-sm">
-                      {isExpanded ? 'Less' : 'Learn more'}
-                    </button>
-                    {!isDone ? (
-                      <button className="btn btn-primary btn-sm" onClick={() => toggleItem(doc.id, 'done')}>
-                        Mark Done
-                      </button>
-                    ) : (
-                      <button className="btn btn-secondary btn-sm" onClick={() => toggleItem(doc.id, 'no')}>
-                        Undo
-                      </button>
-                    )}
+                    <button onClick={() => setExpandedDoc(isExpanded ? null : doc.id)} className="btn btn-secondary btn-sm">{isExpanded ? 'Less' : 'Learn more'}</button>
+                    {!isDone
+                      ? <button className="btn btn-primary btn-sm" onClick={() => toggleItem(doc.id, 'done')}>Mark Done</button>
+                      : <button className="btn btn-secondary btn-sm" onClick={() => toggleItem(doc.id, 'no')}>Undo</button>
+                    }
                   </div>
                 </div>
 
                 {isExpanded && (
                   <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid var(--border)' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
                       <div style={{ background: '#FFF5F5', borderRadius: 'var(--radius-sm)', padding: '14px 16px', border: '1px solid #FED7D7' }}>
                         <div style={{ fontWeight: 600, fontSize: '0.82rem', color: '#C53030', marginBottom: 6 }}>Why This Matters</div>
                         <div style={{ fontSize: '0.85rem', color: 'var(--slate)', lineHeight: 1.6 }}>{doc.why}</div>
@@ -288,46 +311,86 @@ Keep responses concise — 2-4 paragraphs maximum.`,
                       </div>
                     </div>
 
-                    <div style={{ background: 'var(--cream)', borderRadius: 'var(--radius-sm)', padding: '16px', border: '1px solid var(--border)' }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--navy)', marginBottom: 10 }}>
-                        Ask AI a question about this document
+                    {/* Business Finder */}
+                    <div style={{ background: 'var(--cream)', borderRadius: 'var(--radius-sm)', padding: 16, border: '1px solid var(--border)', marginBottom: 16 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--navy)', marginBottom: 2 }}>
+                            📍 {doc.businessLabel} Near {patient?.zip_code || 'You'}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--slate-light)' }}>Within ~10 miles</div>
+                        </div>
+                        <button className="btn btn-primary btn-sm" onClick={() => findBusinesses(doc)} disabled={bizLoading[doc.id]}>
+                          {bizLoading[doc.id] ? 'Searching...' : docBiz.length > 0 ? '🔄 Refresh' : '🔍 Find Near Me'}
+                        </button>
                       </div>
+
+                      {bizLoading[doc.id] && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0' }}>
+                          <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
+                          <span style={{ fontSize: '0.82rem', color: 'var(--slate-light)' }}>Searching nearby...</span>
+                        </div>
+                      )}
+
+                      {bizError[doc.id] && (
+                        <div style={{ fontSize: '0.82rem', color: '#C53030', background: '#FFF5F5', padding: '10px 14px', borderRadius: 8, border: '1px solid #FED7D7' }}>
+                          ⚠️ {bizError[doc.id]}
+                        </div>
+                      )}
+
+                      {docBiz.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                          {docBiz.map((biz, i) => (
+                            <div key={i} style={{ background: 'white', borderRadius: 8, padding: '12px 14px', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--navy)', marginBottom: 2 }}>{i + 1}. {biz.name}</div>
+                                <div style={{ fontSize: '0.78rem', color: 'var(--slate-light)', marginBottom: biz.rating ? 4 : 0 }}>{biz.address}</div>
+                                {biz.rating && (
+                                  <div style={{ fontSize: '0.78rem', color: '#D4956A' }}>
+                                    {renderStars(biz.rating)} {biz.rating}{biz.totalRatings ? ` (${biz.totalRatings.toLocaleString()} reviews)` : ''}
+                                  </div>
+                                )}
+                              </div>
+                              <a href={`https://www.google.com/maps/place/?q=place_id:${biz.placeId}`} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm" style={{ textDecoration: 'none', marginLeft: 12, flexShrink: 0 }}>
+                                View Map
+                              </a>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {docBiz.length === 0 && !bizLoading[doc.id] && !bizError[doc.id] && (
+                        <div style={{ fontSize: '0.82rem', color: 'var(--slate-light)', textAlign: 'center', padding: '8px 0' }}>
+                          Click "Find Near Me" to search for local {doc.businessLabel.toLowerCase()}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* AI Q&A */}
+                    <div style={{ background: 'var(--cream)', borderRadius: 'var(--radius-sm)', padding: '16px', border: '1px solid var(--border)' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--navy)', marginBottom: 10 }}>✨ Ask AI about this document</div>
                       <div style={{ display: 'flex', gap: 10 }}>
                         <input
                           value={question[doc.id] || ''}
                           onChange={e => setQuestion(prev => ({ ...prev, [doc.id]: e.target.value }))}
                           onKeyDown={e => e.key === 'Enter' && askAI(doc)}
                           placeholder={`e.g. "Does ${patient?.name} need this if they already have an advance directive?"`}
-                          style={{
-                            flex: 1, padding: '10px 14px', border: '1.5px solid var(--border)',
-                            borderRadius: 8, fontFamily: 'var(--font-body)', fontSize: '0.875rem',
-                            color: 'var(--navy)', background: 'white', outline: 'none'
-                          }}
+                          style={{ flex: 1, padding: '10px 14px', border: '1.5px solid var(--border)', borderRadius: 8, fontFamily: 'var(--font-body)', fontSize: '0.875rem', color: 'var(--navy)', background: 'white', outline: 'none' }}
                           onFocus={e => e.target.style.borderColor = 'var(--sage)'}
                           onBlur={e => e.target.style.borderColor = 'var(--border)'}
                         />
-                        <button
-                          className="btn btn-primary btn-sm"
-                          onClick={() => askAI(doc)}
-                          disabled={aiLoading[doc.id] || !question[doc.id]?.trim()}
-                        >
+                        <button className="btn btn-primary btn-sm" onClick={() => askAI(doc)} disabled={aiLoading[doc.id] || !question[doc.id]?.trim()}>
                           {aiLoading[doc.id] ? '...' : 'Ask'}
                         </button>
                       </div>
                       {aiLoading[doc.id] && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
                           <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
                           <span style={{ fontSize: '0.82rem', color: 'var(--slate-light)' }}>Getting answer...</span>
                         </div>
                       )}
                       {aiResponse[doc.id] && !aiLoading[doc.id] && (
-                        <div style={{
-                          marginTop: 14, padding: '14px 16px',
-                          background: 'white', borderRadius: 8,
-                          border: '1px solid var(--border)',
-                          fontSize: '0.875rem', color: 'var(--slate)', lineHeight: 1.7,
-                          whiteSpace: 'pre-wrap'
-                        }}>
+                        <div style={{ marginTop: 12, padding: '14px 16px', background: 'white', borderRadius: 8, border: '1px solid var(--border)', fontSize: '0.875rem', color: 'var(--slate)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
                           {aiResponse[doc.id]}
                         </div>
                       )}
