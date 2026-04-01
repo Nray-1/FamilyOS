@@ -7,6 +7,7 @@ import CarePlanner from './CarePlanner'
 import SupportBoard from './SupportBoard'
 import MemoryWall from './MemoryWall'
 import DocumentPlanner from './DocumentPlanner'
+import DocumentPlanner from './DocumentPlanner'
 
 export default function Dashboard() {
   const { user, profile, signOut } = useAuth()
@@ -51,6 +52,7 @@ export default function Dashboard() {
       doctor_phone: data.doctor_phone || '',
       hospital: data.hospital || '',
       status: data.status || 'stable',
+      zip_code: data.zip_code || '',
     })
   }
 
@@ -431,11 +433,6 @@ export default function Dashboard() {
           <DocumentPlanner patient={patient} />
         )}
 
-        {/* ── DOCUMENT PLANNER ── */}
-        {activeSection === 'documents' && patient && (
-          <DocumentPlanner patient={patient} />
-        )}
-
         {/* ── CARE TEAM (admin only) ── */}
         {activeSection === 'team' && (
           <div>
@@ -537,6 +534,7 @@ export default function Dashboard() {
               { label: 'Primary doctor', key: 'primary_doctor' },
               { label: 'Doctor phone', key: 'doctor_phone' },
               { label: 'Hospital / care facility', key: 'hospital' },
+              { label: 'Zip code', key: 'zip_code' },
             ].map(field => (
               <div className="form-group" key={field.key}>
                 <label>{field.label}</label>
