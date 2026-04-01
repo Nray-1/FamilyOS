@@ -123,46 +123,14 @@ export default function DocumentPlanner({ patient }) {
     document.head.appendChild(script)
   }, [])
 
-  const findBusinesses = async (doc) => {
+  const findBusinesses = (doc) => {
     if (!patient?.zip_code) {
       setBizError(prev => ({ ...prev, [doc.id]: 'No zip code on file. Add it via the pencil icon next to the patient name in the sidebar.' }))
       return
     }
-    setBizLoading(prev => ({ ...prev, [doc.id]: true }))
+    const mapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(doc.businessSearch + ' near ' + patient.zip_code)}`
+    setBusinesses(prev => ({ ...prev, [doc.id]: { mapsUrl } }))
     setBizError(prev => ({ ...prev, [doc.id]: null }))
-    setBusinesses(prev => ({ ...prev, [doc.id]: [] }))
-
-    try {
-      const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-      const geocodeRes = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${patient.zip_code}&key=${key}`
-      )
-      const geocodeData = await geocodeRes.json()
-      if (!geocodeData.results?.length) throw new Error('Could not find location for zip code ' + patient.zip_code)
-
-      const { lat, lng } = geocodeData.results[0].geometry.location
-      const placesRes = await fetch(
-        `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(doc.businessSearch)}&location=${lat},${lng}&radius=16000&key=${key}`
-      )
-      const placesData = await placesRes.json()
-
-      if (placesData.status === 'REQUEST_DENIED') throw new Error('Places API not enabled. Enable it in Google Cloud Console.')
-      if (placesData.status === 'ZERO_RESULTS') throw new Error('No results found near ' + patient.zip_code)
-
-      const results = (placesData.results || []).slice(0, 10).map(p => ({
-        name: p.name,
-        address: p.formatted_address,
-        rating: p.rating,
-        totalRatings: p.user_ratings_total,
-        placeId: p.place_id,
-      }))
-
-      setBusinesses(prev => ({ ...prev, [doc.id]: results }))
-    } catch (err) {
-      setBizError(prev => ({ ...prev, [doc.id]: err.message || 'Search failed. Please try again.' }))
-    } finally {
-      setBizLoading(prev => ({ ...prev, [doc.id]: false }))
-    }
   }
 
   const toggleItem = (id, status) => {
@@ -268,7 +236,7 @@ export default function DocumentPlanner({ patient }) {
         {filtered.map(doc => {
           const isDone = checklist[doc.id] === 'done'
           const isExpanded = expandedDoc === doc.id
-          const docBiz = businesses[doc.id] || []
+          const docBiz = businesses[doc.id]
 
           return (
             <div key={doc.id} className="card" style={{ padding: 0, overflow: 'hidden', opacity: isDone ? 0.85 : 1, border: isDone ? '1px solid var(--sage)' : '1px solid var(--border)' }}>
@@ -313,55 +281,32 @@ export default function DocumentPlanner({ patient }) {
 
                     {/* Business Finder */}
                     <div style={{ background: 'var(--cream)', borderRadius: 'var(--radius-sm)', padding: 16, border: '1px solid var(--border)', marginBottom: 16 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
                           <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--navy)', marginBottom: 2 }}>
                             📍 {doc.businessLabel} Near {patient?.zip_code || 'You'}
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--slate-light)' }}>Within ~10 miles</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--slate-light)' }}>Opens Google Maps with businesses within ~10 miles</div>
                         </div>
-                        <button className="btn btn-primary btn-sm" onClick={() => findBusinesses(doc)} disabled={bizLoading[doc.id]}>
-                          {bizLoading[doc.id] ? 'Searching...' : docBiz.length > 0 ? '🔄 Refresh' : '🔍 Find Near Me'}
-                        </button>
+                        {docBiz ? (
+                          <a
+                            href={docBiz.mapsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-primary btn-sm"
+                            style={{ textDecoration: 'none' }}
+                          >
+                            🗺 Open in Google Maps
+                          </a>
+                        ) : (
+                          <button className="btn btn-primary btn-sm" onClick={() => findBusinesses(doc)}>
+                            🔍 Find Near Me
+                          </button>
+                        )}
                       </div>
-
-                      {bizLoading[doc.id] && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0' }}>
-                          <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
-                          <span style={{ fontSize: '0.82rem', color: 'var(--slate-light)' }}>Searching nearby...</span>
-                        </div>
-                      )}
-
                       {bizError[doc.id] && (
-                        <div style={{ fontSize: '0.82rem', color: '#C53030', background: '#FFF5F5', padding: '10px 14px', borderRadius: 8, border: '1px solid #FED7D7' }}>
+                        <div style={{ marginTop: 10, fontSize: '0.82rem', color: '#C53030', background: '#FFF5F5', padding: '10px 14px', borderRadius: 8, border: '1px solid #FED7D7' }}>
                           ⚠️ {bizError[doc.id]}
-                        </div>
-                      )}
-
-                      {docBiz.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-                          {docBiz.map((biz, i) => (
-                            <div key={i} style={{ background: 'white', borderRadius: 8, padding: '12px 14px', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--navy)', marginBottom: 2 }}>{i + 1}. {biz.name}</div>
-                                <div style={{ fontSize: '0.78rem', color: 'var(--slate-light)', marginBottom: biz.rating ? 4 : 0 }}>{biz.address}</div>
-                                {biz.rating && (
-                                  <div style={{ fontSize: '0.78rem', color: '#D4956A' }}>
-                                    {renderStars(biz.rating)} {biz.rating}{biz.totalRatings ? ` (${biz.totalRatings.toLocaleString()} reviews)` : ''}
-                                  </div>
-                                )}
-                              </div>
-                              <a href={`https://www.google.com/maps/place/?q=place_id:${biz.placeId}`} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm" style={{ textDecoration: 'none', marginLeft: 12, flexShrink: 0 }}>
-                                View Map
-                              </a>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {docBiz.length === 0 && !bizLoading[doc.id] && !bizError[doc.id] && (
-                        <div style={{ fontSize: '0.82rem', color: 'var(--slate-light)', textAlign: 'center', padding: '8px 0' }}>
-                          Click "Find Near Me" to search for local {doc.businessLabel.toLowerCase()}
                         </div>
                       )}
                     </div>
