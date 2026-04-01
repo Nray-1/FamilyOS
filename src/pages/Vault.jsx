@@ -155,35 +155,30 @@ await supabase.from('lab_results').insert({
     setSingleDocLoading(prev => ({ ...prev, [lab.id]: true }))
     setSingleDocAnalysis(prev => ({ ...prev, [lab.id]: '' }))
     try {
-      const isImage = lab.file_type?.startsWith('image/')
-      const isPDF = lab.file_type === 'application/pdf'
+     let messageContent = []
+const urls = lab.file_urls || (lab.file_url ? [lab.file_url] : [])
 
-      let messageContent = []
-
-      if (lab.file_url && (isImage || isPDF)) {
-        // Fetch the file and convert to base64
-        const res = await fetch(lab.file_url)
-        const blob = await res.blob()
-        const base64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = () => resolve(reader.result.split(',')[1])
-          reader.onerror = reject
-          reader.readAsDataURL(blob)
-        })
-
-        if (isPDF) {
-          messageContent = [
-            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
-            { type: 'text', text: `Please analyze this lab report for ${patient.name}. Extract all test values, identify what's normal vs abnormal, explain what each result means in plain language, and highlight anything that should be discussed with the doctor. The patient's conditions are: ${patient.primary_diagnosis || 'not specified'}, ${patient.other_conditions || 'none'}.` }
-          ]
-        } else {
-          messageContent = [
-            { type: 'image', source: { type: 'base64', media_type: lab.file_type, data: base64 } },
-            { type: 'text', text: `Please analyze this lab report image for ${patient.name}. Extract all test values, identify what's normal vs abnormal, explain what each result means in plain language, and highlight anything that should be discussed with the doctor. The patient's conditions are: ${patient.primary_diagnosis || 'not specified'}, ${patient.other_conditions || 'none'}.` }
-          ]
-        }
-      } else {
-        messageContent = [{ type: 'text', text: `Analyze these lab results for ${patient.name}: ${lab.results}` }]
+if (urls.length > 0) {
+  for (const url of urls) {
+    const res = await fetch(url)
+    const blob = await res.blob()
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result.split(',')[1])
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+    const mimeType = blob.type || 'image/jpeg'
+    if (mimeType === 'application/pdf') {
+      messageContent.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } })
+    } else {
+      messageContent.push({ type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } })
+    }
+  }
+  messageContent.push({ type: 'text', text: `Please analyze these lab results for ${patient.name}. There are ${urls.length} file(s) above. Extract all test values, identify what's normal vs abnormal, explain what each result means in plain language, and highlight anything that should be discussed with the doctor. Patient conditions: ${patient.primary_diagnosis || 'not specified'}, ${patient.other_conditions || 'none'}.` })
+} else {
+  messageContent = [{ type: 'text', text: `Analyze these lab results for ${patient.name}: ${lab.results}` }]
+}
       }
 
       const response = await fetch('https://api.anthropic.com/v1/messages', {
