@@ -7,7 +7,6 @@ import CarePlanner from './CarePlanner'
 import SupportBoard from './SupportBoard'
 import MemoryWall from './MemoryWall'
 import DocumentPlanner from './DocumentPlanner'
-import DocumentPlanner from './DocumentPlanner'
 
 export default function Dashboard() {
   const { user, profile, signOut } = useAuth()
