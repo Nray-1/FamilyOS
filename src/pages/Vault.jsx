@@ -438,11 +438,13 @@ export default function Vault({ patient }) {
             <div className="form-group">
               <label>Upload document *</label>
               <input
-                type="file"
-                ref={labFileRef}
-                accept=".pdf,.jpg,.jpeg,.png"
-                style={{ padding: '8px 0' }}
-                onChange={e => setLabFile(e.target.files[0])}
+  type="file"
+  ref={labFileRef}
+  accept=".pdf,.jpg,.jpeg,.png"
+  multiple
+  style={{ padding: '8px 0' }}
+  onChange={e => setLabFile(Array.from(e.target.files))}
+/>
               />
               <div style={{ fontSize: '0.75rem', color: 'var(--slate-light)', marginTop: 4 }}>
                 PDF or image (JPG, PNG). AI will read the document directly.
