@@ -23,6 +23,7 @@ export default function Dashboard() {
   const [editForm, setEditForm] = useState({})
   const [editLoading, setEditLoading] = useState(false)
   const [editMsg, setEditMsg] = useState('')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const userRole = profile?.system_role || 'admin'
   const isAdmin = userRole === 'admin'
@@ -109,6 +110,11 @@ export default function Dashboard() {
     }
   }
 
+  const navigate = (section) => {
+    setActiveSection(section)
+    setSidebarOpen(false)
+  }
+
   const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?'
 
   const formatDate = (dateStr) => {
@@ -138,7 +144,19 @@ export default function Dashboard() {
 
   return (
     <div className="app-layout">
-      <aside className="sidebar">
+
+      {/* ── Mobile Top Bar ── */}
+      <div className="mobile-topbar">
+        <div className="mobile-topbar-logo">CaringCircle</div>
+        <button className={`hamburger${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(!sidebarOpen)} aria-label="Menu">
+          <span /><span /><span />
+        </button>
+      </div>
+
+      {/* ── Mobile Overlay ── */}
+      <div className={`sidebar-overlay${sidebarOpen ? '' : ' hidden'}`} onClick={() => setSidebarOpen(false)} />
+
+      <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
         <div className="sidebar-header">
           <div className="sidebar-logo">CaringCircle</div>
         </div>
@@ -167,7 +185,7 @@ export default function Dashboard() {
         )}
         <nav className="sidebar-nav">
           {navItems.map(item => (
-            <button key={item.id} className={'nav-item' + (activeSection === item.id ? ' active' : '')} onClick={() => setActiveSection(item.id)}>
+            <button key={item.id} className={'nav-item' + (activeSection === item.id ? ' active' : '')} onClick={() => navigate(item.id)}>
               <span>{item.emoji}</span> {item.label}
             </button>
           ))}
