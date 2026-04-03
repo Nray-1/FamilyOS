@@ -187,6 +187,8 @@ export default function Vault({ patient }) {
   const [labMsg, setLabMsg] = useState('')
   const [singleDocAnalysis, setSingleDocAnalysis] = useState({})
   const [singleDocLoading, setSingleDocLoading] = useState({})
+  const [insuranceAnalysis, setInsuranceAnalysis] = useState({})
+  const [insuranceLoading, setInsuranceLoading] = useState({})
   const fileRef = useRef(null)
   const labFileRef = useRef(null)
 
@@ -357,6 +359,46 @@ export default function Vault({ patient }) {
     await fetchLabResults()
   }
 
+  const analyzeInsurance = async (doc) => {
+    setInsuranceLoading(prev => ({ ...prev, [doc.id]: true }))
+    setInsuranceAnalysis(prev => ({ ...prev, [doc.id]: '' }))
+    try {
+      const res = await fetch(doc.file_url)
+      const blob = await res.blob()
+      const base64 = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result.split(',')[1]); r.onerror = reject; r.readAsDataURL(blob) })
+      const mimeType = blob.type || 'image/jpeg'
+      const fileContent = mimeType === 'application/pdf'
+        ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
+        : { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } }
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': import.meta.env.VITE_ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 2000,
+          system: 'You are a compassionate insurance expert helping a family understand their health insurance coverage. Be clear, warm, and avoid jargon. Organize your response with clear headers.',
+          messages: [{ role: 'user', content: [
+            fileContent,
+            { type: 'text', text: `Please analyze this insurance card/document for ${patient.name} and provide a complete breakdown including:
+
+1. **Plan Summary** — Insurance company, plan name, member ID, group number, effective date
+2. **What's Covered** — List all covered services (primary care, specialists, emergency, hospital, mental health, prescriptions, lab work, imaging, preventive care, etc.)
+3. **Cost Breakdown** — Deductible, out-of-pocket maximum, copays for each service type, coinsurance
+4. **Prescription Coverage** — Tiers, copays, formulary information if available
+5. **Network Information** — In-network vs out-of-network rules, how to find in-network providers
+6. **Important Phone Numbers & Resources** — Customer service, prior authorization, nurse hotline, etc.
+7. **Key Tips for This Plan** — What to always do before getting care, how to maximize benefits, common mistakes to avoid
+
+Be thorough and specific. This family needs to understand exactly what they have.` }
+          ]}] })
+      })
+      const data = await response.json()
+      setInsuranceAnalysis(prev => ({ ...prev, [doc.id]: data.content?.[0]?.text || 'Unable to analyze.' }))
+    } catch { setInsuranceAnalysis(prev => ({ ...prev, [doc.id]: 'Unable to connect. Please try again.' })) }
+    finally { setInsuranceLoading(prev => ({ ...prev, [doc.id]: false })) }
+  }
+
   const formatSize = (bytes) => { if (!bytes) return ''; if (bytes < 1024) return bytes + ' B'; if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'; return (bytes / 1048576).toFixed(1) + ' MB' }
   const formatDate = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   const filteredDocs = activeTab === 'all' ? documents : activeTab === 'labs' ? [] : documents.filter(d => d.category === activeTab)
@@ -454,6 +496,7 @@ export default function Vault({ patient }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
               {filteredDocs.map(doc => {
                 const cat = getCategoryInfo(doc.category)
+                const isInsurance = doc.category === 'insurance'
                 return (
                   <div key={doc.id} className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
@@ -465,10 +508,28 @@ export default function Vault({ patient }) {
                     </div>
                     {doc.notes && <div style={{ fontSize: '0.82rem', color: 'var(--slate)', lineHeight: 1.5 }}>{doc.notes}</div>}
                     <div style={{ fontSize: '0.75rem', color: 'var(--slate-light)' }}>Uploaded {formatDate(doc.created_at)} by {doc.profiles?.full_name || 'Admin'}</div>
-                    <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
                       <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm" style={{ flex: 1, textAlign: 'center', textDecoration: 'none' }}>View</a>
-                      <button className="btn btn-danger btn-sm" onClick={() => deleteDocument(doc)} style={{ flex: 1 }}>Delete</button>
+                      {isInsurance && (
+                        <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => analyzeInsurance(doc)} disabled={insuranceLoading[doc.id]}>
+                          {insuranceLoading[doc.id] ? 'Analyzing...' : '✨ What\'s Covered'}
+                        </button>
+                      )}
+                      <button className="btn btn-danger btn-sm" onClick={() => deleteDocument(doc)} style={{ flex: isInsurance ? 'none' : 1 }}>Delete</button>
                     </div>
+                    {insuranceLoading[doc.id] && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px', background: 'var(--cream)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                        <div className="spinner" style={{ width: 18, height: 18, borderWidth: 2, flexShrink: 0 }} />
+                        <span style={{ fontSize: '0.85rem', color: 'var(--slate-light)' }}>Reading your insurance document...</span>
+                      </div>
+                    )}
+                    {insuranceAnalysis[doc.id] && !insuranceLoading[doc.id] && (
+                      <div style={{ background: 'var(--sage-light)', border: '1px solid var(--sage)', borderRadius: 'var(--radius-sm)', padding: '16px 18px' }}>
+                        <div style={{ fontWeight: 600, color: 'var(--sage-dark)', marginBottom: 10, fontSize: '0.875rem' }}>✨ Coverage Breakdown</div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--slate)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{insuranceAnalysis[doc.id]}</div>
+                        <div style={{ marginTop: 10, fontSize: '0.75rem', color: 'var(--slate-light)', fontStyle: 'italic' }}>⚠️ Always verify coverage details directly with your insurance provider.</div>
+                      </div>
+                    )}
                   </div>
                 )
               })}
