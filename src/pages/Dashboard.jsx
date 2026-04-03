@@ -117,6 +117,16 @@ export default function Dashboard() {
 
   const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?'
 
+  const getAge = (dob) => {
+    if (!dob) return null
+    const today = new Date()
+    const birth = new Date(dob)
+    let age = today.getFullYear() - birth.getFullYear()
+    const m = today.getMonth() - birth.getMonth()
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--
+    return age
+  }
+
   const formatDate = (dateStr) => {
     const d = new Date(dateStr), now = new Date(), diff = now - d
     if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago'
@@ -158,6 +168,7 @@ export default function Dashboard() {
 
       <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
         <div className="sidebar-header">
+          <div className="sidebar-logo-icon">CC</div>
           <div className="sidebar-logo">CaringCircle</div>
         </div>
         {patient && (
@@ -177,28 +188,40 @@ export default function Dashboard() {
                 )}
               </div>
               <div className="patient-status">
-                <div className="status-dot" style={{ background: patient.status === 'critical' ? '#FC8181' : '#68D391' }} />
-                {patient.status}
+                <div className="status-dot" style={{ background: patient.status === 'critical' ? '#FC8181' : '#4ADE80', boxShadow: patient.status === 'critical' ? '0 0 6px rgba(252,129,129,0.7)' : '0 0 6px rgba(74,222,128,0.7)' }} />
+                <span style={{ textTransform: 'capitalize' }}>{patient.status}</span>
+                {getAge(patient.date_of_birth) && <>
+                  <div className="patient-meta-divider" />
+                  <span>Age {getAge(patient.date_of_birth)}</span>
+                </>}
               </div>
             </div>
           </div>
         )}
         <nav className="sidebar-nav">
-          {navItems.map(item => (
-            <button key={item.id} className={'nav-item' + (activeSection === item.id ? ' active' : '')} onClick={() => navigate(item.id)}>
-              <span>{item.emoji}</span> {item.label}
-            </button>
-          ))}
+          {navItems.map((item, i) => {
+            const adminItems = ['documents', 'bills', 'team']
+            const prevItem = navItems[i - 1]
+            const showDivider = adminItems.includes(item.id) && prevItem && !adminItems.includes(prevItem.id)
+            return (
+              <div key={item.id}>
+                {showDivider && <div className="nav-divider" />}
+                <button className={'nav-item' + (activeSection === item.id ? ' active' : '')} onClick={() => navigate(item.id)}>
+                  <span>{item.emoji}</span> {item.label}
+                </button>
+              </div>
+            )
+          })}
         </nav>
         <div className="sidebar-footer">
           <div className="user-info">
             <div className="user-avatar">{getInitials(profile?.full_name || '')}</div>
             <div>
               <div className="user-name">{profile?.full_name || 'User'}</div>
-              <div className="user-role" style={{ textTransform: 'capitalize' }}>{userRole.replace('_', ' ')}</div>
+              <div className="user-role">{userRole.replace('_', ' ')}</div>
             </div>
           </div>
-          <button className="nav-item" onClick={signOut} style={{ color: 'rgba(255,255,255,0.5)' }}>Sign out</button>
+          <button className="nav-item" onClick={signOut} style={{ color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>Sign out</button>
         </div>
       </aside>
 
@@ -207,10 +230,15 @@ export default function Dashboard() {
         {/* ── HOME ── */}
         {activeSection === 'home' && (
           <div>
-            <div className="page-header">
-              <h1 className="page-title">{patient ? patient.name + ' Care Hub' : 'Your Care Hub'}</h1>
-              <p className="page-subtitle">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            <div className="page-hero">
+              <div className="page-hero-title">{patient ? patient.name + ' Care Hub' : 'Your Care Hub'}</div>
+              <div className="page-hero-sub">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+              <div className="page-hero-badge">
+                <div className="status-dot" />
+                {patient ? `${patient.name} is ${patient.status}` : 'Welcome to CaringCircle'}
+              </div>
             </div>
+            <div className="main-inner">
             {isCommunity && (
               <div style={{ background: 'linear-gradient(135deg, var(--sage-light), var(--amber-light))', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '20px 24px', marginBottom: 28, display: 'flex', alignItems: 'center', gap: 16 }}>
                 <span style={{ fontSize: '2rem' }}>❤️</span>
@@ -275,20 +303,21 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+            </div>{/* end main-inner */}
           </div>
         )}
 
-        {activeSection === 'updates' && patient && <UpdateFeed patient={patient} />}
-        {activeSection === 'vault' && patient && <Vault patient={patient} />}
-        {activeSection === 'care' && patient && <CarePlanner patient={patient} />}
-        {activeSection === 'support' && patient && <SupportBoard patient={patient} userRole={userRole} />}
-        {activeSection === 'media' && patient && <MemoryWall patient={patient} userRole={userRole} />}
-        {activeSection === 'documents' && patient && <DocumentPlanner patient={patient} />}
-        {activeSection === 'bills' && patient && <MedicalBills patient={patient} />}
+        {activeSection === 'updates' && patient && <div className="main-inner"><UpdateFeed patient={patient} /></div>}
+        {activeSection === 'vault' && patient && <div className="main-inner"><Vault patient={patient} /></div>}
+        {activeSection === 'care' && patient && <div className="main-inner"><CarePlanner patient={patient} /></div>}
+        {activeSection === 'support' && patient && <div className="main-inner"><SupportBoard patient={patient} userRole={userRole} /></div>}
+        {activeSection === 'media' && patient && <div className="main-inner"><MemoryWall patient={patient} userRole={userRole} /></div>}
+        {activeSection === 'documents' && patient && <div className="main-inner"><DocumentPlanner patient={patient} /></div>}
+        {activeSection === 'bills' && patient && <div className="main-inner"><MedicalBills patient={patient} /></div>}
 
         {/* ── CARE TEAM ── */}
         {activeSection === 'team' && (
-          <div>
+          <div className="main-inner">
             <div className="page-header">
               <h1 className="page-title">Care Team</h1>
               <p className="page-subtitle">Manage who has access</p>
@@ -326,7 +355,7 @@ export default function Dashboard() {
         )}
 
         {!['home','updates','team','vault','care','support','media','documents','bills'].includes(activeSection) && (
-          <div>
+          <div className="main-inner">
             <div className="page-header"><h1 className="page-title">{navItems.find(n => n.id === activeSection)?.label}</h1><p className="page-subtitle">Coming soon</p></div>
             <div className="card"><div className="empty-state"><p style={{ fontSize: '3rem', marginBottom: 16 }}>🚧</p><h3>Coming soon</h3><p>This feature is being built.</p></div></div>
           </div>
