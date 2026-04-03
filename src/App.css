@@ -199,7 +199,7 @@ a:hover { text-decoration: underline; }
   .sidebar-overlay.hidden { display: none; }
 
   .app-layout { display: block; }
-  .main-content { margin-left: 0; width: 100%; }
+  .main-content { margin-left: 0; width: 100%; padding-top: var(--topbar-height); }
 
   .page-hero { padding: 20px 16px 22px; }
   .page-hero-title { font-size: 1.2rem; }
